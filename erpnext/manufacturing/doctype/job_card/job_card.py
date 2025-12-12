@@ -1062,17 +1062,17 @@ class JobCard(Document):
 		# 	# 		OperationSequenceError,
 		# 	# 	)
 
-			# if row.completed_qty < current_operation_qty:
-			# 	frappe.throw(
-			# 		_(
-			# 			"The completed quantity {0} of an operation {1} cannot be greater than the completed quantity {2} of a previous operation {3}."
-			# 		).format(
-			# 			bold(current_operation_qty),
-			# 			bold(self.operation),
-			# 			bold(row.completed_qty),
-			# 			bold(row.operation),
-			# 		)
-			# 	)
+		# if row.completed_qty < current_operation_qty:
+		# 	frappe.throw(
+		# 		_(
+		# 			"The completed quantity {0} of an operation {1} cannot be greater than the completed quantity {2} of a previous operation {3}."
+		# 		).format(
+		# 			bold(current_operation_qty),
+		# 			bold(self.operation),
+		# 			bold(row.completed_qty),
+		# 			bold(row.operation),
+		# 		)
+		# 	)
 
 	def validate_work_order(self):
 		if self.is_work_order_closed():

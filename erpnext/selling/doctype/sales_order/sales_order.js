@@ -971,13 +971,13 @@ erpnext.selling.SalesOrderController = class SalesOrderController extends erpnex
 		);
 	}
 
-	make_raw_material_request(material_request_type="Purchase") {
+	make_raw_material_request(material_request_type = "Purchase") {
 		var me = this;
 		this.frm.call({
 			method: "erpnext.selling.doctype.sales_order.sales_order.get_work_order_items",
 			args: {
 				sales_order: this.frm.docname,
-				for_raw_material_request: 1
+				for_raw_material_request: 1,
 			},
 			callback: function (r) {
 				if (!r.message) {
