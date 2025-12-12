@@ -444,6 +444,7 @@ def start_auto_reconcile(
 
 	frappe.flags.auto_reconcile_vouchers = False
 
+
 def get_auto_reconcile_message(partially_reconciled, reconciled):
 	"""Returns alert message and indicator for auto reconciliation depending on result state."""
 	alert_message, indicator = "", "blue"
