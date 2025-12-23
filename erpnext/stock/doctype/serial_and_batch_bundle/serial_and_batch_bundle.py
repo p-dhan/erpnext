@@ -241,6 +241,7 @@ class SerialandBatchBundle(Document):
 			"check_serial_nos": True,
 			"serial_nos": serial_nos,
 		}
+
 		if self.voucher_type == "POS Invoice":
 			kwargs["ignore_voucher_nos"] = [self.voucher_no]
 
@@ -1976,9 +1977,9 @@ def get_available_serial_nos(kwargs):
 
 	order_by = "creation"
 	if kwargs.based_on == "LIFO":
-		order_by = "creation desc"
+		order_by = "creation"
 	elif kwargs.based_on == "Expiry":
-		order_by = "amc_expiry_date asc"
+		order_by = "amc_expiry_date"
 
 	filters = {"item_code": kwargs.item_code}
 
@@ -2008,6 +2009,8 @@ def get_available_serial_nos(kwargs):
 		filters["name"] = ("in", time_based_serial_nos)
 	elif ignore_serial_nos:
 		filters["name"] = ("not in", ignore_serial_nos)
+	elif kwargs.get("serial_nos"):
+		filters["name"] = ("in", kwargs.get("serial_nos"))
 
 	if kwargs.get("batches"):
 		batches = get_non_expired_batches(kwargs.get("batches"))
@@ -2016,13 +2019,52 @@ def get_available_serial_nos(kwargs):
 
 		filters["batch_no"] = ("in", batches)
 
-	return frappe.get_all(
-		"Serial No",
-		fields=fields,
-		filters=filters,
-		limit=cint(kwargs.qty) or 10000000,
-		order_by=order_by,
-	)
+	return get_serial_nos_based_on_filters(filters, fields, order_by, kwargs)
+
+
+def get_serial_nos_based_on_filters(filters, fields, order_by, kwargs):
+	doctype = frappe.qb.DocType("Serial No")
+
+	order_by_column = getattr(doctype, order_by)
+	query = frappe.qb.from_(doctype).limit(cint(kwargs.qty) or 10000000).for_update()
+
+	if kwargs.based_on == "LIFO":
+		query = query.orderby(order_by_column, order=frappe.query_builder.Order.desc)
+	else:
+		query = query.orderby(order_by_column)
+
+	for key, value in filters.items():
+		column = getattr(doctype, key)
+
+		if isinstance(value, tuple):
+			operator = value[0]
+
+			if operator == "between":
+				query = query.where(column.between(value[1], value[2]))
+
+			elif operator == "in":
+				query = query.where(column.isin(value[1]))
+
+			elif operator == "not in":
+				query = query.where(column.notin(value[1]))
+
+			elif operator == "is":
+				if value[1] == "set":
+					query = query.where(column.isnotnull())
+				elif value[1] == "not set":
+					query = query.where(column.isnull())
+		else:
+			query = query.where(column == value)
+
+	for field in fields:
+		if " as " in field.lower():
+			# Split field and alias
+			field_name, alias = field.split(" as ", 1)
+			query = query.select(getattr(doctype, field_name).as_(alias))
+		else:
+			query = query.select(getattr(doctype, field))
+
+	return query.run(as_dict=True)
 
 
 def get_non_expired_batches(batches):
