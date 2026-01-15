@@ -1287,44 +1287,48 @@ class JobCard(Document):
 		current_operation_qty += flt(self.total_completed_qty)
 
 		data = frappe.get_all(
-			"Work Order Operation",
-			fields=["operation", "status", "completed_qty", "sequence_id"],
-			filters={"docstatus": 1, "parent": self.work_order, "sequence_id": ("<", self.sequence_id)},
+			"Job Card",
+			fields=["operation", "status", "total_completed_qty", "sequence_id"],
+			filters={
+				"docstatus": ("<=", 1),
+				"work_order": self.work_order,
+				"sequence_id": ("<", self.sequence_id),
+			},
 			order_by="sequence_id, idx",
 		)
 
-		message = "Job Card {}: As per the sequence of the operations in the work order {}".format(
-			bold(self.name), bold(get_link_to_form("Work Order", self.work_order))
-		)
+		# message = "Job Card {}: As per the sequence of the operations in the work order {}".format(
+		# 	bold(self.name), bold(get_link_to_form("Work Order", self.work_order))
+		# )
 
-		for row in data:
-			if not row.completed_qty:
-				frappe.throw(
-					_("{0}, complete the operation {1} before the operation {2}.").format(
-						message, bold(row.operation), bold(self.operation)
-					),
-					OperationSequenceError,
-				)
+		# for row in data:
+		# 	if not row.completed_qty:
+		# 		frappe.throw(
+		# 			_("{0}, complete the operation {1} before the operation {2}.").format(
+		# 				message, bold(row.operation), bold(self.operation)
+		# 			),
+		# 			OperationSequenceError,
+		# 		)
 
-			if row.status != "Completed" and row.completed_qty < current_operation_qty:
-				frappe.throw(
-					_("{0}, complete the operation {1} before the operation {2}.").format(
-						message, bold(row.operation), bold(self.operation)
-					),
-					OperationSequenceError,
-				)
+		# 	if row.status != "Completed" and row.completed_qty < current_operation_qty:
+		# 		frappe.throw(
+		# 			_("{0}, complete the operation {1} before the operation {2}.").format(
+		# 				message, bold(row.operation), bold(self.operation)
+		# 			),
+		# 			OperationSequenceError,
+		# 		)
 
-			if row.completed_qty < current_operation_qty:
-				frappe.throw(
-					_(
-						"The completed quantity {0} of an operation {1} cannot be greater than the completed quantity {2} of a previous operation {3}."
-					).format(
-						bold(current_operation_qty),
-						bold(self.operation),
-						bold(row.completed_qty),
-						bold(row.operation),
-					)
-				)
+		# if row.completed_qty < current_operation_qty:
+		# 	frappe.throw(
+		# 		_(
+		# 			"The completed quantity {0} of an operation {1} cannot be greater than the completed quantity {2} of a previous operation {3}."
+		# 		).format(
+		# 			bold(current_operation_qty),
+		# 			bold(self.operation),
+		# 			bold(row.completed_qty),
+		# 			bold(row.operation),
+		# 		)
+		# 	)
 
 	def validate_work_order(self):
 		if self.is_work_order_closed():
