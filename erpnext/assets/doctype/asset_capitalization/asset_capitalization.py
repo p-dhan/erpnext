@@ -76,6 +76,7 @@ class AssetCapitalization(StockController):
 		naming_series: DF.Literal["ACC-ASC-.YYYY.-"]
 		posting_date: DF.Date
 		posting_time: DF.Time
+		project: DF.Link | None
 		service_items: DF.Table[AssetCapitalizationServiceItem]
 		service_items_total: DF.Currency
 		set_posting_time: DF.Check
