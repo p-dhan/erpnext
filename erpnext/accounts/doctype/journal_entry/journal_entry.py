@@ -416,7 +416,7 @@ class JournalEntry(AccountsController):
 			if (
 				d.schedule_date == self.posting_date
 				and not d.journal_entry
-				and flt(d.precision("depreciation_amount")) == flt(je_row.debit)
+				and flt(d.depreciation_amount, d.precision("depreciation_amount")) == flt(je_row.debit)
 			):
 				frappe.db.set_value("Depreciation Schedule", d.name, "journal_entry", self.name)
 
