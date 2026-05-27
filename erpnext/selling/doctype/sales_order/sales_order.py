@@ -452,7 +452,7 @@ class SalesOrder(SellingController):
 				and not cint(d.delivered_by_supplier)
 			):
 				frappe.throw(
-					_("Delivery warehouse required for stock item {0}").format(d.item_code), WarehouseRequired
+					_("Source warehouse required for stock item {0}").format(d.item_code), WarehouseRequired
 				)
 
 	def validate_with_previous_doc(self):
@@ -684,18 +684,12 @@ class SalesOrder(SellingController):
 
 		for item in self.items:
 			if item.delivered_by_supplier:
-				item_delivered_qty = frappe.db.sql(
-					"""select sum(qty)
-					from `tabPurchase Order Item` poi, `tabPurchase Order` po
-					where poi.sales_order_item = %s
-						and poi.item_code = %s
-						and poi.parent = po.name
-						and po.docstatus = 1
-						and po.status = 'Delivered'""",
-					(item.name, item.item_code),
-				)
-
-				item_delivered_qty = item_delivered_qty[0][0] if item_delivered_qty else 0
+				item_delivered_qty = frappe.get_all(
+					"Purchase Order Item",
+					{"sales_order_item": item.name, "docstatus": 1},
+					[{"SUM": "received_qty", "AS": "received_qty"}],
+					pluck="received_qty",
+				)[0]
 				item.db_set("delivered_qty", flt(item_delivered_qty), update_modified=False)
 
 			delivered_qty += min(item.delivered_qty, item.qty)
@@ -1804,6 +1798,7 @@ def make_work_orders(items, sales_order, company, project=None):
 	return [p.name for p in out]
 
 
+@frappe.whitelist()
 def make_production_plan(source_name, target_doc=None):
 	sales_order = frappe.get_doc("Sales Order", source_name)
 

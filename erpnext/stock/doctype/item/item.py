@@ -82,7 +82,6 @@ class Item(Document):
 		brand: DF.Link | None
 		country_of_origin: DF.Link | None
 		create_new_batch: DF.Check
-		customer: DF.Link | None
 		customer_code: DF.SmallText | None
 		customer_items: DF.Table[ItemCustomerDetail]
 		customs_tariff_number: DF.Link | None
@@ -181,6 +180,14 @@ class Item(Document):
 		if self.standard_rate:
 			for default in self.item_defaults or [frappe._dict()]:
 				self.add_price(default.default_price_list)
+
+			frappe.msgprint(
+				_("Item Price created at rate {0}").format(
+					frappe.format(self.standard_rate, {"fieldtype": "Currency"})
+				),
+				indicator="green",
+				alert=True,
+			)
 
 		if self.opening_stock:
 			self.set_opening_stock()
@@ -285,7 +292,7 @@ class Item(Document):
 		if not self.is_stock_item or self.has_serial_no or self.has_batch_no:
 			return
 
-		if not self.valuation_rate and not self.standard_rate and not self.is_customer_provided_item:
+		if self.valuation_rate is None and not self.is_customer_provided_item:
 			frappe.throw(_("Valuation Rate is mandatory if Opening Stock entered"))
 
 		from erpnext.stock.doctype.stock_entry.stock_entry_utils import make_stock_entry
@@ -310,13 +317,37 @@ class Item(Document):
 					item_code=self.name,
 					target=default_warehouse,
 					qty=self.opening_stock,
-					rate=self.valuation_rate or self.standard_rate,
+					rate=self.valuation_rate,
 					company=default.company,
 					posting_date=getdate(),
 					posting_time=nowtime(),
+					do_not_save=True,
 				)
 
+				if self.valuation_rate == 0:
+					for item in stock_entry.items:
+						item.allow_zero_valuation_rate = 1
+
+				stock_entry.insert()
+				stock_entry.submit()
+				stock_entry.load_from_db()
 				stock_entry.add_comment("Comment", _("Opening Stock"))
+
+				stock_entry_link = frappe.utils.get_link_to_form("Stock Entry", stock_entry.name)
+				if self.valuation_rate == 0:
+					frappe.msgprint(
+						_("Opening Stock entry created with zero valuation rate: {0}").format(
+							stock_entry_link
+						),
+						indicator="orange",
+						alert=True,
+					)
+				else:
+					frappe.msgprint(
+						_("Opening Stock entry created: {0}").format(stock_entry_link),
+						indicator="green",
+						alert=True,
+					)
 
 	def validate_fixed_asset(self):
 		if self.is_fixed_asset:
@@ -840,8 +871,13 @@ class Item(Document):
 					if disabled:
 						frappe.throw(_("Attribute {0} is disabled.").format(frappe.bold(d.attribute)))
 
-					if not numeric_values and not frappe.db.exists(
-						"Item Attribute Value", {"parent": d.attribute, "attribute_value": d.attribute_value}
+					if (
+						not numeric_values
+						and d.attribute_value
+						and not frappe.db.exists(
+							"Item Attribute Value",
+							{"parent": d.attribute, "attribute_value": d.attribute_value},
+						)
 					):
 						frappe.throw(
 							_("Attribute Value {0} is not valid for the selected attribute {1}.").format(
