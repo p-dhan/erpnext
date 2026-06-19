@@ -1480,11 +1480,7 @@ class StockEntry(StockController, SubcontractingInwardController):
 				if cost_allocation_per and flt(d.transfer_qty):
 					d.basic_rate = (outgoing_items_cost * (cost_allocation_per / 100)) / d.transfer_qty
 
-			if (
-				not d.basic_rate
-				and not d.allow_zero_valuation_rate
-				and not(d.is_finished_item and self.purpose == "Manufacture")
-			):
+			if not d.basic_rate and not d.allow_zero_valuation_rate:
 				if self.is_new():
 					raise_error_if_no_rate = False
 
@@ -1651,19 +1647,18 @@ class StockEntry(StockController, SubcontractingInwardController):
 		else:
 			incoming_items_cost = sum(flt(t.basic_amount) for t in self.get("items") if t.t_warehouse)
 
+		if not incoming_items_cost:
+			return	
+
 		for d in self.get("items"):
 			if self.purpose in ("Repack", "Manufacture") and not d.is_finished_item:
 				d.additional_cost = 0
-				continue
-			elif self.purpose == "Manufacture" and d.is_finished_item and not d.basic_amount and d.qty:
-				d.additional_cost = self.total_additional_costs
 				continue
 			elif not d.t_warehouse:
 				d.additional_cost = 0
 				continue
 
-			if incoming_items_cost and flt(incoming_items_cost) != 0.0:
-				d.additional_cost = (flt(d.basic_amount) / incoming_items_cost) * self.total_additional_costs
+			d.additional_cost = (flt(d.basic_amount) / incoming_items_cost) * self.total_additional_costs
 
 	def update_valuation_rate(self, reset_outgoing_rate=True):
 		for d in self.get("items"):
