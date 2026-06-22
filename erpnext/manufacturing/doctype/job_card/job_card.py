@@ -372,14 +372,6 @@ class JobCard(Document):
 				frappe.get_cached_value("Workstation", self.workstation, "production_capacity") or 1
 			)
 
-		if self.get_open_job_cards(args.get("employee")):
-			frappe.throw(
-				_(
-					"Employee {0} is currently working on another workstation. Please assign another employee."
-				).format(args.get("employee")),
-				OverlapError,
-			)
-
 		if not self.has_overlap(production_capacity, time_logs):
 			return {}
 
