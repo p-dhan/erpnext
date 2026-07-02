@@ -1661,6 +1661,18 @@ def add_operating_cost_component_wise(stock_entry, work_order=None, op_expense_a
 			},
 		)
 
+		if not workstation_cost:
+			workstation_type = frappe.db.get_value("Workstation", row.workstation, "workstation_type")
+			if workstation_type:
+				workstation_cost = frappe.get_all(
+					"Workstation Cost",
+					fields=["operating_component", "operating_cost"],
+					filters={
+						"parent": workstation_type,
+						"parenttype": "Workstation Type",
+					},
+				)
+
 		consumed_operating_cost = (
 			get_consumed_operating_cost(work_order.name, stock_entry.bom_no, row.name) or []
 		)
