@@ -295,6 +295,7 @@ def get_ar_filters(doc, entry):
 		"range2": 60,
 		"range3": 90,
 		"range4": 120,
+		"in_party_currency": 1 if doc.currency else 0,
 	}
 
 
