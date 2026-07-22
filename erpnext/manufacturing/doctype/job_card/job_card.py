@@ -374,14 +374,6 @@ class JobCard(Document):
 				frappe.get_cached_value("Workstation", self.workstation, "production_capacity") or 1
 			)
 
-		if self.get_open_job_cards(args.get("employee")):
-			frappe.throw(
-				_(
-					"Employee {0} is currently working on another workstation. Please assign another employee."
-				).format(args.get("employee")),
-				OverlapError,
-			)
-
 		if not self.has_overlap(production_capacity, time_logs):
 			return {}
 
@@ -1375,56 +1367,48 @@ class JobCard(Document):
 		current_operation_qty += flt(self.total_completed_qty)
 
 		previous_operations = frappe.get_all(
-			"Work Order Operation",
-			fields=["name", "operation", "status", "completed_qty", "sequence_id", "finished_good"],
-			filters={"docstatus": 1, "parent": self.work_order, "sequence_id": ("<", self.sequence_id)},
+			"Job Card",
+			fields=["name", "operation", "status", "total_completed_qty", "sequence_id", "finished_good"],
+			filters={"docstatus": ("<=", 1), "work_order": self.work_order, "sequence_id": ("<", self.sequence_id)},
 			order_by="sequence_id, idx",
 		)
 
-		message = "Job Card {}: As per the sequence of the operations in the work order {}".format(
-			bold(self.name), bold(get_link_to_form("Work Order", self.work_order))
-		)
+		# message = "Job Card {}: As per the sequence of the operations in the work order {}".format(
+		# 	bold(self.name), bold(get_link_to_form("Work Order", self.work_order))
+		# )
 
-		if self.track_semi_finished_goods and previous_operations:
-			manufactured_qty = self.get_manufactured_qty_per_operation(
-				[row.name for row in previous_operations]
-			)
+		# if self.track_semi_finished_goods and previous_operations:
+		# 	manufactured_qty = self.get_manufactured_qty_per_operation(
+		# 		[row.name for row in previous_operations]
+		# 	)
 
-			for row in previous_operations:
-				row.manufactured_qty = flt(manufactured_qty.get(row.name))
+		# 	for row in previous_operations:
+		# 		row.manufactured_qty = flt(manufactured_qty.get(row.name))
 
-		for row in previous_operations:
-			if self.track_semi_finished_goods:
-				self.validate_previous_operation_manufactured_qty(row, current_operation_qty)
-				continue
+		# for row in previous_operations:
+		# 	if self.track_semi_finished_goods:
+		# 		self.validate_previous_operation_manufactured_qty(row, current_operation_qty)
+		# 		continue
 
-			if not row.completed_qty:
-				frappe.throw(
-					_("{0}, complete the operation {1} before the operation {2}.").format(
-						message, bold(row.operation), bold(self.operation)
-					),
-					OperationSequenceError,
-				)
+		# 	if not row.completed_qty:
+		# 		frappe.throw(
+		# 			_("{0}, complete the operation {1} before the operation {2}.").format(
+		# 				message, bold(row.operation), bold(self.operation)
+		# 			),
+		# 			OperationSequenceError,
+		# 		)
 
-			if row.status != "Completed" and row.completed_qty < current_operation_qty:
-				frappe.throw(
-					_("{0}, complete the operation {1} before the operation {2}.").format(
-						message, bold(row.operation), bold(self.operation)
-					),
-					OperationSequenceError,
-				)
-
-			if row.completed_qty < current_operation_qty:
-				frappe.throw(
-					_(
-						"The completed quantity {0} of an operation {1} cannot be greater than the completed quantity {2} of a previous operation {3}."
-					).format(
-						bold(self.get_qty_with_uom(current_operation_qty)),
-						bold(self.operation),
-						bold(self.get_qty_with_uom(row.completed_qty, row.finished_good)),
-						bold(row.operation),
-					)
-				)
+		# 	if row.completed_qty < current_operation_qty:
+		# 		frappe.throw(
+		# 			_(
+		# 				"The completed quantity {0} of an operation {1} cannot be greater than the completed quantity {2} of a previous operation {3}."
+		# 			).format(
+		# 				bold(self.get_qty_with_uom(current_operation_qty)),
+		# 				bold(self.operation),
+		# 				bold(self.get_qty_with_uom(row.completed_qty, row.finished_good)),
+		# 				bold(row.operation),
+		# 			)
+		# 		)
 
 	def get_manufactured_qty_per_operation(self, operation_ids):
 		job_card = frappe.qb.DocType("Job Card")
