@@ -291,7 +291,7 @@ class WorkOrder(Document):
 			self.set_required_items(reset_only_qty=len(self.get("required_items")))
 
 		self.enable_auto_reserve_stock()
-		self.validate_operations_sequence()
+		# self.validate_operations_sequence()
 		self.validate_subcontracting_inward_order()
 
 	def validate_dates(self):
