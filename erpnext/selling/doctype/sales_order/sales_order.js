@@ -84,8 +84,7 @@ frappe.ui.form.on("Sales Order", {
 				frm.doc.status !== "Closed" &&
 				flt(frm.doc.per_delivered) < 100 &&
 				flt(frm.doc.per_billed) < 100 &&
-				frm.has_perm("write") &&
-				!frm.doc.is_subcontracted
+				frm.has_perm("write")
 			) {
 				frm.add_custom_button(__("Update Items"), () => {
 					erpnext.utils.update_child_items({
