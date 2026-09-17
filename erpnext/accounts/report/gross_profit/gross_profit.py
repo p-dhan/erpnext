@@ -520,6 +520,7 @@ class GrossProfitGenerator:
 			self.group_items_by_invoice()
 
 		self.load_non_stock_items()
+		self.load_subcontracting_inward_costs()
 		self.get_returned_invoice_items()
 		self.allocate_legacy_return_items()
 		self.process()
@@ -855,6 +856,9 @@ class GrossProfitGenerator:
 			if buying_amount is not None:
 				return buying_amount
 
+		if row.so_detail and row.so_detail in self.subcontracting_inward_buying_rate:
+			return flt(row.qty) * self.subcontracting_inward_buying_rate[row.so_detail]
+
 		if item_code in self.non_stock_items and (row.project or row.cost_center):
 			# Issue 6089-Get last purchasing rate for non-stock item
 			item_rate = self.get_last_purchase_rate(item_code, row)
@@ -885,6 +889,82 @@ class GrossProfitGenerator:
 				return flt(row.qty) * self.get_average_buying_rate(row, item_code)
 
 		return flt(row.qty) * self.get_average_buying_rate(row, item_code)
+
+	def load_subcontracting_inward_costs(self):
+		"""
+		An invoice item billed against a Subcontracting Inward Order's service item
+		(e.g. a job-work/machining charge) has no stock movement or purchase record of
+		its own, so the usual buying-amount lookups resolve to 0. The real cost is the
+		linked Work Order's operating cost, captured as Additional Costs on the
+		Manufacture Stock Entry(s) against the finished good the service produced.
+		Build a Sales Order Item -> buying rate map from that cost so get_buying_amount()
+		can use it instead of silently reporting 0.
+		"""
+		self.subcontracting_inward_buying_rate = {}
+
+		so_details = list({row.so_detail for row in self.si_list if row.so_detail})
+		if not so_details:
+			return
+
+		from frappe.query_builder.functions import Sum
+
+		SCIOrder = qb.DocType("Subcontracting Inward Order")
+		SCIServiceItem = qb.DocType("Subcontracting Inward Order Service Item")
+
+		service_rows = (
+			qb.from_(SCIServiceItem)
+			.join(SCIOrder)
+			.on(SCIOrder.name == SCIServiceItem.parent)
+			.select(
+				SCIServiceItem.sales_order_item,
+				SCIServiceItem.fg_item,
+				SCIOrder.name.as_("subcontracting_inward_order"),
+			)
+			.where((SCIOrder.docstatus == 1) & (SCIServiceItem.sales_order_item.isin(so_details)))
+			.run(as_dict=True)
+		)
+		if not service_rows:
+			return
+
+		sci_orders = list({row.subcontracting_inward_order for row in service_rows})
+		fg_items = list({row.fg_item for row in service_rows})
+
+		SCIItem = qb.DocType("Subcontracting Inward Order Item")
+		produced_qty_map = {
+			(row.parent, row.item_code): flt(row.produced_qty)
+			for row in qb.from_(SCIItem)
+			.select(SCIItem.parent, SCIItem.item_code, SCIItem.produced_qty)
+			.where(SCIItem.parent.isin(sci_orders) & SCIItem.item_code.isin(fg_items))
+			.run(as_dict=True)
+		}
+
+		StockEntry = qb.DocType("Stock Entry")
+		cost_map = {
+			row.subcontracting_inward_order: flt(row.cost)
+			for row in qb.from_(StockEntry)
+			.select(StockEntry.subcontracting_inward_order, Sum(StockEntry.total_additional_costs).as_("cost"))
+			.where(
+				(StockEntry.docstatus == 1)
+				& (StockEntry.purpose == "Manufacture")
+				& (StockEntry.subcontracting_inward_order.isin(sci_orders))
+			)
+			.groupby(StockEntry.subcontracting_inward_order)
+			.run(as_dict=True)
+		}
+
+		totals = {}
+		for row in service_rows:
+			produced_qty = produced_qty_map.get((row.subcontracting_inward_order, row.fg_item))
+			if not produced_qty:
+				continue
+
+			cost = cost_map.get(row.subcontracting_inward_order, 0.0)
+			total_cost, total_qty = totals.setdefault(row.sales_order_item, [0.0, 0.0])
+			totals[row.sales_order_item] = [total_cost + cost, total_qty + produced_qty]
+
+		for so_detail, (total_cost, total_qty) in totals.items():
+			if total_qty:
+				self.subcontracting_inward_buying_rate[so_detail] = flt(total_cost / total_qty)
 
 	def load_drop_ship_buying_rates(self):
 		self.drop_ship_buying_rates = {}

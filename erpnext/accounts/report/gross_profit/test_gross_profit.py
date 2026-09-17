@@ -1025,6 +1025,69 @@ class TestGrossProfit(ERPNextTestSuite):
 		self.assertEqual(invoice_row.qty, 30000)
 		self.assertEqual(invoice_row.buying_amount, 999999.9)
 
+	def test_subcontracting_inward_service_item_buying_amount(self):
+		"""
+		A Sales Invoice item billed against a Subcontracting Inward Order's service
+		item (e.g. a machining/job-work charge) has no stock movement or purchase
+		record of its own. Its buying amount should come from the linked Work
+		Order's operating cost (captured as Additional Costs on the Manufacture
+		Stock Entry against the finished good), not be silently reported as 0.
+		"""
+		from erpnext.manufacturing.doctype.work_order.work_order import (
+			make_stock_entry as make_stock_entry_from_wo,
+		)
+		from erpnext.selling.doctype.sales_order.sales_order import (
+			make_sales_invoice as make_sales_invoice_from_so,
+		)
+		from erpnext.subcontracting.doctype.subcontracting_inward_order.test_subcontracting_inward_order import (
+			create_so_scio,
+			create_test_data,
+		)
+
+		create_test_data()
+		make_stock_entry(item_code="Self RM", qty=100, to_warehouse="Stores - _TC", purpose="Material Receipt")
+
+		so, scio = create_so_scio()
+		frappe.new_doc("Stock Entry").update(scio.make_rm_stock_entry_inward()).submit()
+
+		scio.reload()
+		wo = frappe.get_doc("Work Order", scio.make_work_order()[0])
+		wo.skip_transfer = 1
+		wo.required_items[-1].source_warehouse = "Stores - _TC"
+		wo.submit()
+
+		manufacture = frappe.new_doc("Stock Entry").update(make_stock_entry_from_wo(wo.name, "Manufacture"))
+		manufacture.append(
+			"additional_costs",
+			{
+				"expense_account": self.expense_account,
+				"description": "Operating Cost",
+				"amount": 250,
+			},
+		)
+		manufacture.submit()
+
+		scio.reload()
+		frappe.new_doc("Stock Entry").update(scio.make_subcontracting_delivery()).submit()
+		scio.reload()
+
+		si = make_sales_invoice_from_so(so.name)
+		si.submit()
+
+		filters = frappe._dict(
+			company=si.company, from_date=si.posting_date, to_date=si.posting_date, group_by="Invoice"
+		)
+		_, data = execute(filters=filters)
+
+		service_row = next(
+			row for row in data if row.parent_invoice == si.name and row.item_code == "Service Item 1"
+		)
+		# 5 units produced against ₹250 of operating cost captured on the Manufacture
+		# Stock Entry -> ₹50/unit, instead of the 0 the report would show without the fix.
+		self.assertEqual(service_row.buying_rate, 50.0)
+		self.assertEqual(service_row.buying_amount, 250.0)
+		self.assertEqual(service_row.gross_profit, service_row.selling_amount - 250.0)
+
 	def create_drop_ship_order(self, qty=10, selling_rate=100, buying_rate=80):
 		from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_invoice
 		from erpnext.selling.doctype.sales_order.sales_order import make_purchase_order
