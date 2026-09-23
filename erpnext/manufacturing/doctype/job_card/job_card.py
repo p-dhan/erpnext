@@ -171,7 +171,7 @@ class JobCard(Document):
 		self.validate_on_hold()
 		self.set_status()
 		self.validate_operation_id()
-		self.validate_sequence_id()
+		# self.validate_sequence_id()
 		self.set_sub_operations()
 		self.update_sub_operation_status()
 		if self.sub_operations:
@@ -1826,7 +1826,7 @@ def make_time_log(kwargs):
 
 	kwargs = frappe._dict(kwargs)
 	doc = frappe.get_doc("Job Card", kwargs.job_card_id)
-	doc.validate_sequence_id()
+	# doc.validate_sequence_id()
 	doc.add_time_log(kwargs)
 	doc.set_status(update_status=True)
 
