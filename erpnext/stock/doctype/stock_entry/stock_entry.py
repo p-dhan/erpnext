@@ -1221,7 +1221,7 @@ class StockEntry(StockController, SubcontractingInwardController):
 			):
 				if not self.fg_completed_qty:
 					frappe.throw(_("For Quantity (Manufactured Qty) is mandatory"))
-				self.check_if_operations_completed()
+				# self.check_if_operations_completed()
 				self.check_duplicate_entry_for_work_order()
 		elif self.purpose != "Material Transfer":
 			self.work_order = None
