@@ -383,11 +383,15 @@ class PaymentEntry(AccountsController):
 
 		fail_message = _("Row #{0}: Allocated Amount cannot be greater than outstanding amount.")
 		for d in self.get("references"):
-			if (flt(d.allocated_amount)) > 0 and flt(d.allocated_amount) > flt(d.outstanding_amount):
+			precision = d.precision("allocated_amount")
+			allocated_amount = flt(d.allocated_amount, precision)
+			outstanding_amount = flt(d.outstanding_amount, precision)
+
+			if allocated_amount > 0 and allocated_amount > outstanding_amount:
 				frappe.throw(fail_message.format(d.idx))
 
 			# Check for negative outstanding invoices as well
-			if flt(d.allocated_amount) < 0 and flt(d.allocated_amount) < flt(d.outstanding_amount):
+			if allocated_amount < 0 and allocated_amount < outstanding_amount:
 				frappe.throw(fail_message.format(d.idx))
 
 	def validate_allocated_amount_as_per_payment_request(self):
@@ -488,12 +492,16 @@ class PaymentEntry(AccountsController):
 
 			fail_message = _("Row #{0}: Allocated Amount cannot be greater than outstanding amount.")
 
+			precision = d.precision("allocated_amount")
+			allocated_amount = flt(d.allocated_amount, precision)
+			outstanding_amount = flt(latest.outstanding_amount, precision)
+
 			if (
 				d.payment_term
 				and (
-					(flt(d.allocated_amount)) > 0
+					allocated_amount > 0
 					and latest.payment_term_outstanding
-					and (flt(d.allocated_amount) > flt(latest.payment_term_outstanding))
+					and (allocated_amount > flt(latest.payment_term_outstanding, precision))
 				)
 				and self.term_based_allocation_enabled_for_reference(d.reference_doctype, d.reference_name)
 			):
@@ -503,11 +511,11 @@ class PaymentEntry(AccountsController):
 					).format(d.idx, d.allocated_amount, latest.payment_term_outstanding, d.payment_term)
 				)
 
-			if (flt(d.allocated_amount)) > 0 and flt(d.allocated_amount) > flt(latest.outstanding_amount):
+			if allocated_amount > 0 and allocated_amount > outstanding_amount:
 				frappe.throw(fail_message.format(d.idx))
 
 			# Check for negative outstanding invoices as well
-			if flt(d.allocated_amount) < 0 and flt(d.allocated_amount) < flt(latest.outstanding_amount):
+			if allocated_amount < 0 and allocated_amount < outstanding_amount:
 				frappe.throw(fail_message.format(d.idx))
 
 	def delink_advance_entry_references(self):
@@ -2689,7 +2697,7 @@ def get_negative_outstanding_invoices(
 			"{voucher_type}" as voucher_type, name as voucher_no, {account} as account,
 			if({rounded_total_field}, {rounded_total_field}, {grand_total_field}) as invoice_amount,
 			outstanding_amount, posting_date,
-			due_date, conversion_rate as exchange_rate
+			due_date, conversion_rate as exchange_rate, %s as currency
 		from
 			`tab{voucher_type}`
 		where
@@ -2699,8 +2707,8 @@ def get_negative_outstanding_invoices(
 			{condition}
 		order by
 			posting_date, name
-		""".format(
-			**{
+		""".format_map(
+			{
 				"supplier_condition": supplier_condition,
 				"condition": condition,
 				"rounded_total_field": rounded_total_field,
@@ -2712,7 +2720,7 @@ def get_negative_outstanding_invoices(
 				"account": account,
 			}
 		),
-		(party, party_account),
+		(party_account_currency, party, party_account),
 		as_dict=True,
 	)
 
