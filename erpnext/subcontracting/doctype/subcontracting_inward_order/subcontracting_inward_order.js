@@ -125,6 +125,13 @@ frappe.ui.form.on("Subcontracting Inward Order", {
 					);
 				}
 			}
+			if (frm.doc.status == "Closed" && frm.doc.per_produced > 0 && frm.doc.per_delivered < 100) {
+				frm.add_custom_button(
+					__("Subcontracting Delivery"),
+					() => frm.events.make_subcontracting_delivery(frm),
+					__("Create")
+				);
+			}
 			if (frm.doc.status != "Closed") {
 				const is_raw_materials_received = frm.doc.received_items.some((item) =>
 					item.is_customer_provided_item
