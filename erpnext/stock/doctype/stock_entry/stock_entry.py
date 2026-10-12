@@ -2192,6 +2192,14 @@ class StockEntry(StockController, SubcontractingInwardController):
 	def validate_closed_subcontracting_order(self):
 		order = self.get("subcontracting_order") or self.get("subcontracting_inward_order")
 		if order:
+			if (
+				self.purpose == "Subcontracting Delivery"
+				and self.get("subcontracting_inward_order")
+				and frappe.db.get_value("Subcontracting Inward Order", order, "status") == "Closed"
+			):
+				# Produced goods can still be delivered after the order is closed
+				return
+
 			check_on_hold_or_closed_status(
 				"Subcontracting Order" if self.get("subcontracting_order") else "Subcontracting Inward Order",
 				order,
