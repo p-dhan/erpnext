@@ -487,7 +487,7 @@ frappe.ui.form.on("Work Order", {
 		var added_min = false;
 
 		// produced qty
-		let produced_qty = frm.doc.produced_qty - frm.doc.disassembled_qty;
+		let produced_qty = flt(frm.doc.produced_qty) - flt(frm.doc.disassembled_qty);
 		var title = __("{0} items produced", [produced_qty]);
 		bars.push({
 			title: title,
@@ -578,7 +578,7 @@ frappe.ui.form.on("Work Order", {
 			});
 
 			for (let key in status_wise_oprtation_data) {
-				title = __("{0} Operations: {1}", [key, status_wise_oprtation_data[key][1].bold()]);
+				title = __("{0} Operations: {1}", [__(key), status_wise_oprtation_data[key][1].bold()]);
 				bars.push({
 					title: title,
 					width: (status_wise_oprtation_data[key][0] / total_completed_qty) * 100 + "%",
@@ -1005,7 +1005,6 @@ erpnext.work_order = {
 					// ignore stale responses if the company changed while the request was in flight
 					if (!r.exe && frm.doc.company === company) {
 						frm.set_value("wip_warehouse", r.message.wip_warehouse);
-						frm.set_value("fg_warehouse", r.message.fg_warehouse);
 						frm.set_value("scrap_warehouse", r.message.scrap_warehouse);
 					}
 				},
