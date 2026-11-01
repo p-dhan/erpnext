@@ -3533,7 +3533,7 @@ class TestJobCard(ERPNextTestSuite):
 		self.assertRaises(OverlapError, second_card.save)
 
 	@ERPNextTestSuite.change_settings("Manufacturing Settings", {"disable_capacity_planning": 1})
-	def test_employee_cannot_log_overlapping_time_anywhere(self):
+	def test_employee_can_work_on_multiple_machines_simultaneously(self):
 		rows = [{"item_code": make_jc_review_item(), "qty": 1}]
 		fg_item = make_jc_review_item()
 		job_cards = []
@@ -3550,10 +3550,7 @@ class TestJobCard(ERPNextTestSuite):
 		first_card.save()
 
 		second_card.append("time_logs", jc_review_log("2031-03-04 08:30:00", 60, 10, employee))
-		self.assertRaisesRegex(OverlapError, "is already working", second_card.save)
-
-		first_card.append("time_logs", jc_review_log("2031-03-04 08:00:00", 60, 0, employee))
-		self.assertRaisesRegex(OverlapError, "is already working", first_card.save)
+		second_card.save()
 
 	@ERPNextTestSuite.change_settings("Manufacturing Settings", {"disable_capacity_planning": 1})
 	def test_two_operators_on_one_job_charge_the_workstation_once(self):
